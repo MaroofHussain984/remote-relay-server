@@ -15,7 +15,7 @@ wss.on('connection', (ws) => {
         if (!isBinary) {
             const msg = message.toString().trim();
             
-            // 1. Host Registration (REG:ID:PASSWORD)
+            // 1. Host Registration
             if (msg.startsWith('REG:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
@@ -27,7 +27,7 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).password = password;
                 console.log(`Host Registered: ${currentId}`);
             }
-            // 2. Viewer Connection Request (CONNECT:TARGET_ID:PASSWORD)
+            // 2. Viewer Connection Request
             else if (msg.startsWith('CONNECT:')) {
                 const parts = msg.split(':');
                 const targetId = parts[1];
@@ -40,9 +40,8 @@ wss.on('connection', (ws) => {
                     if (room.password === password) {
                         room.viewerWs = ws;
                         ws.send('OK');
-                        // Host ko signal dein ke streaming shuru kare
                         room.hostWs.send('START_STREAM');
-                        console.log(`Viewer successfully connected to host ${targetId}`);
+                        console.log(`Viewer connected to host ${targetId}`);
                     } else {
                         ws.send('WRONG_PASSWORD');
                     }
@@ -50,17 +49,19 @@ wss.on('connection', (ws) => {
                     ws.send('OFFLINE');
                 }
             }
+            // 3. NAYA: Viewer ke commands (MOVE, LCLICK, KEY) ko Host tak forward karna
+            else if (role === 'viewer' && currentId) {
+                const room = rooms.get(currentId);
+                if (room && room.hostWs && room.hostWs.readyState === WebSocket.OPEN) {
+                    room.hostWs.send(message);
+                }
+            }
         } else {
-            // Binary Data Relay (Screen Frames & Mouse/Keyboard commands)
+            // Binary Data Relay (Screen Frames from Host to Viewer)
             if (role === 'host' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.viewerWs && room.viewerWs.readyState === WebSocket.OPEN) {
                     room.viewerWs.send(message, { binary: true });
-                }
-            } else if (role === 'viewer' && currentId) {
-                const room = rooms.get(currentId);
-                if (room && room.hostWs && room.hostWs.readyState === WebSocket.OPEN) {
-                    room.hostWs.send(message, { binary: true });
                 }
             }
         }
