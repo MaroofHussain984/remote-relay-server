@@ -1,43 +1,39 @@
-const net = require('net');
+const WebSocket = require('ws');
 const PORT = process.env.PORT || 10000;
 
-const clients = new Map(); // ID -> Socket mapping
+const clients = new Map(); // ID -> WebSocket mapping
 
-const server = net.createServer((socket) => {
+const wss = new WebSocket.Server({ port: PORT }, () => {
+    console.log(`WebSocket Relay Server running on port ${PORT}`);
+});
+
+wss.on('connection', (ws) => {
     let myId = null;
 
-    socket.on('data', (data) => {
-        const msg = data.toString().trim();
+    ws.on('message', (message) => {
+        const msg = message.toString().trim();
         
-        // 1. Jab koi app apni ID register kare
+        // 1. ID Registration
         if (msg.startsWith('REG:')) {
             myId = msg.split(':')[1];
-            clients.set(myId, socket);
+            clients.set(myId, ws);
             console.log(`Client Registered: ${myId}`);
         }
-        // 2. Jab koi viewer kisi ID se connect hona chahe
+        // 2. Connection Request
         else if (msg.startsWith('CONNECT:')) {
             const targetId = msg.split(':')[1];
-            const targetSocket = clients.get(targetId);
+            const targetWs = clients.get(targetId);
 
-            if (targetSocket) {
-                socket.write('OK\n');
-                socket.pipe(targetSocket);
-                targetSocket.pipe(socket);
-                console.log(`Bridged connection between viewer and ${targetId}`);
+            if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                ws.send('OK');
+                console.log(`Bridged connection to ${targetId}`);
             } else {
-                socket.write('DENIED\n');
+                ws.send('DENIED');
             }
         }
     });
 
-    socket.on('close', () => {
+    ws.on('close', () => {
         if (myId) clients.delete(myId);
     });
-    
-    socket.on('err', () => {});
-});
-
-server.listen(PORT, () => {
-    console.log(`Relay Server running on port ${PORT}`);
 });
