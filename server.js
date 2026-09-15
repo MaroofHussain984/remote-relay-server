@@ -14,7 +14,7 @@ wss.on('connection', (ws) => {
     ws.on('message', (message, isBinary) => {
         if (!isBinary) {
             const msg = message.toString().trim();
-            console.log(`Received: ${msg}`); // Debugging ke liye
+            console.log(`[Server Received]: ${msg}`); // Debugging
 
             // 1. Host Registration
             if (msg.startsWith('REG:')) {
@@ -50,7 +50,7 @@ wss.on('connection', (ws) => {
                     ws.send('OFFLINE');
                 }
             }
-            // 3. NAYA: Viewer Control Connection (Mouse/Keyboard ke liye)
+            // 3. Viewer Control Connection (Mouse/Keyboard)
             else if (msg.startsWith('VIEWER:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
@@ -64,7 +64,10 @@ wss.on('connection', (ws) => {
             else if (role === 'viewer_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.hostWs && room.hostWs.readyState === WebSocket.OPEN) {
+                    console.log(`Forwarding to Host ${currentId}: ${msg}`); // Debugging
                     room.hostWs.send(message);
+                } else {
+                    console.log(`Cannot forward. Host WS not open for ${currentId}`); // Debugging
                 }
             }
         } else {
@@ -84,6 +87,7 @@ wss.on('connection', (ws) => {
             if (role === 'host') rooms.delete(currentId);
             else if (role === 'viewer') room.viewerWs = null;
             else if (role === 'viewer_control') room.viewerControlWs = null;
+            console.log(`Connection closed for ${role}: ${currentId}`);
         }
     });
 });
