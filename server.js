@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 const PORT = process.env.PORT || 10000;
 
-const rooms = new Map(); // ID -> { hostWs, password, viewerWs }
+const rooms = new Map(); // ID -> { hostWs, password, viewerWs, viewerControlWs }
 
 const wss = new WebSocket.Server({ port: PORT }, () => {
     console.log(`WebSocket Relay Server running on port ${PORT}`);
@@ -9,12 +9,13 @@ const wss = new WebSocket.Server({ port: PORT }, () => {
 
 wss.on('connection', (ws) => {
     let currentId = null;
-    let role = null; // 'host' ya 'viewer'
+    let role = null; // 'host', 'viewer', 'viewer_control'
 
     ws.on('message', (message, isBinary) => {
         if (!isBinary) {
             const msg = message.toString().trim();
-            
+            console.log(`Received: ${msg}`); // Debugging ke liye
+
             // 1. Host Registration
             if (msg.startsWith('REG:')) {
                 const parts = msg.split(':');
@@ -27,7 +28,7 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).password = password;
                 console.log(`Host Registered: ${currentId}`);
             }
-            // 2. Viewer Connection Request
+            // 2. Viewer Video Stream Connection
             else if (msg.startsWith('CONNECT:')) {
                 const parts = msg.split(':');
                 const targetId = parts[1];
@@ -41,7 +42,7 @@ wss.on('connection', (ws) => {
                         room.viewerWs = ws;
                         ws.send('OK');
                         room.hostWs.send('START_STREAM');
-                        console.log(`Viewer connected to host ${targetId}`);
+                        console.log(`Viewer (Video) connected to host ${targetId}`);
                     } else {
                         ws.send('WRONG_PASSWORD');
                     }
@@ -49,8 +50,18 @@ wss.on('connection', (ws) => {
                     ws.send('OFFLINE');
                 }
             }
-            // 3. NAYA: Viewer ke commands (MOVE, LCLICK, KEY) ko Host tak forward karna
-            else if (role === 'viewer' && currentId) {
+            // 3. NAYA: Viewer Control Connection (Mouse/Keyboard ke liye)
+            else if (msg.startsWith('VIEWER:')) {
+                const parts = msg.split(':');
+                currentId = parts[1];
+                role = 'viewer_control';
+                
+                if (!rooms.has(currentId)) rooms.set(currentId, {});
+                rooms.get(currentId).viewerControlWs = ws;
+                console.log(`Viewer (Control) connected for: ${currentId}`);
+            }
+            // 4. Control Commands Forwarding (MOVE, LCLICK, KEY)
+            else if (role === 'viewer_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.hostWs && room.hostWs.readyState === WebSocket.OPEN) {
                     room.hostWs.send(message);
@@ -72,6 +83,7 @@ wss.on('connection', (ws) => {
             const room = rooms.get(currentId);
             if (role === 'host') rooms.delete(currentId);
             else if (role === 'viewer') room.viewerWs = null;
+            else if (role === 'viewer_control') room.viewerControlWs = null;
         }
     });
 });
