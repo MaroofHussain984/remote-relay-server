@@ -81,13 +81,15 @@ wss.on('connection', (ws) => {
         }
     });
 
-    ws.on('close', () => {
+        ws.on('close', () => {
         if (currentId && rooms.has(currentId)) {
             const room = rooms.get(currentId);
-            if (role === 'host') rooms.delete(currentId);
+            if (role === 'host') {
+                rooms.delete(currentId);
+                console.log(`Host Disconnected: ${currentId}`);
+            }
             else if (role === 'viewer') room.viewerWs = null;
             else if (role === 'viewer_control') room.viewerControlWs = null;
-            console.log(`Connection closed for ${role}: ${currentId}`);
         }
     });
 });
