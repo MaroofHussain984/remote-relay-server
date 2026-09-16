@@ -51,7 +51,7 @@ wss.on('connection', (ws) => {
                     } else { ws.send('WRONG_PASSWORD'); }
                 } else { ws.send('OFFLINE'); }
             }
-            // 4. Viewer Control Connection
+                        // 4. Viewer Control Connection
             else if (msg.startsWith('VIEWER:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
@@ -60,11 +60,11 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).viewerControlWs = ws;
                 console.log(`Viewer (Control) connected for: ${currentId}`);
             }
-            // 5. Control Commands Forwarding (Viewer_Control se Host_Control tak)
+            // 5. Control Commands Forwarding
             else if (role === 'viewer_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.hostControlWs && room.hostControlWs.readyState === WebSocket.OPEN) {
-                    room.hostControlWs.send(message);
+                    room.hostControlWs.send(message.toString()); // <--- YAHAN .toString() LAGAYEIN
                     console.log(`Forwarded to Host Control: ${currentId}`);
                 } else {
                     console.log(`Host Control WS not found for ${currentId}`);
