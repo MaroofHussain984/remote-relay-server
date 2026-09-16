@@ -16,6 +16,7 @@ wss.on('connection', (ws) => {
             const msg = message.toString().trim();
             console.log(`[Server Received]: ${msg}`);
 
+            // 1. Host Registration (Video ke liye)
             if (msg.startsWith('REG:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
@@ -25,6 +26,7 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).password = parts[2];
                 console.log(`Host Registered: ${currentId}`);
             }
+            // 2. Host Control Registration (Mouse/Keyboard/File ke liye)
             else if (msg.startsWith('HOST_CTRL:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
@@ -33,6 +35,7 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).hostControlWs = ws;
                 console.log(`Host Control Connected: ${currentId}`);
             }
+            // 3. Viewer Video Stream Connection
             else if (msg.startsWith('CONNECT:')) {
                 const parts = msg.split(':');
                 const targetId = parts[1];
@@ -44,9 +47,11 @@ wss.on('connection', (ws) => {
                         room.viewerWs = ws;
                         ws.send('OK');
                         room.hostWs.send('START_STREAM');
+                        console.log(`Viewer (Video) connected to host ${targetId}`);
                     } else { ws.send('WRONG_PASSWORD'); }
                 } else { ws.send('OFFLINE'); }
             }
+            // 4. Viewer Control Connection
             else if (msg.startsWith('VIEWER:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
@@ -55,37 +60,37 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).viewerControlWs = ws;
                 console.log(`Viewer (Control) connected for: ${currentId}`);
             }
-            // Control Commands Forwarding (Mouse/Keyboard/FileStart/FileEnd)
+            // 5. Text Commands Forwarding (FIXED: .toString() lagaya gaya hai)
             else if (role === 'viewer_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.hostControlWs && room.hostControlWs.readyState === WebSocket.OPEN) {
-                    room.hostControlWs.send(message);
+                    room.hostControlWs.send(message.toString()); 
                 }
             }
             else if (role === 'host_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.viewerControlWs && room.viewerControlWs.readyState === WebSocket.OPEN) {
-                    room.viewerControlWs.send(message);
+                    room.viewerControlWs.send(message.toString()); 
                 }
             }
         } else {
-            // NAYA: Binary Data Relay (Files aur Screen Frames)
+            // Binary Data Relay (Screen Frames & File Chunks)
             if (role === 'host' && currentId) {
-                // Screen Frames from Host to Viewer
+                // Host -> Viewer (Screen)
                 const room = rooms.get(currentId);
                 if (room && room.viewerWs && room.viewerWs.readyState === WebSocket.OPEN) {
                     room.viewerWs.send(message, { binary: true });
                 }
             }
             else if (role === 'host_control' && currentId) {
-                // File data from Host to Viewer
+                // Host -> Viewer (File)
                 const room = rooms.get(currentId);
                 if (room && room.viewerControlWs && room.viewerControlWs.readyState === WebSocket.OPEN) {
                     room.viewerControlWs.send(message, { binary: true });
                 }
             }
             else if (role === 'viewer_control' && currentId) {
-                // File data from Viewer to Host
+                // Viewer -> Host (File)
                 const room = rooms.get(currentId);
                 if (room && room.hostControlWs && room.hostControlWs.readyState === WebSocket.OPEN) {
                     room.hostControlWs.send(message, { binary: true });
