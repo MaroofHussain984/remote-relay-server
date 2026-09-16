@@ -21,18 +21,16 @@ wss.on('connection', (ws) => {
                 const parts = msg.split(':');
                 currentId = parts[1];
                 role = 'host';
-                
                 if (!rooms.has(currentId)) rooms.set(currentId, {});
                 rooms.get(currentId).hostWs = ws;
                 rooms.get(currentId).password = parts[2];
                 console.log(`Host Registered: ${currentId}`);
             }
-            // 2. Host Control Registration (Mouse/Keyboard receive karne ke liye)
+            // 2. Host Control Registration (Commands receive karne ke liye)
             else if (msg.startsWith('HOST_CTRL:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
                 role = 'host_control';
-                
                 if (!rooms.has(currentId)) rooms.set(currentId, {});
                 rooms.get(currentId).hostControlWs = ws;
                 console.log(`Host Control Connected: ${currentId}`);
@@ -43,7 +41,6 @@ wss.on('connection', (ws) => {
                 const targetId = parts[1];
                 role = 'viewer';
                 currentId = targetId;
-
                 const room = rooms.get(targetId);
                 if (room && room.hostWs && room.hostWs.readyState === WebSocket.OPEN) {
                     if (room.password === parts[2]) {
@@ -51,19 +48,14 @@ wss.on('connection', (ws) => {
                         ws.send('OK');
                         room.hostWs.send('START_STREAM');
                         console.log(`Viewer (Video) connected to host ${targetId}`);
-                    } else {
-                        ws.send('WRONG_PASSWORD');
-                    }
-                } else {
-                    ws.send('OFFLINE');
-                }
+                    } else { ws.send('WRONG_PASSWORD'); }
+                } else { ws.send('OFFLINE'); }
             }
             // 4. Viewer Control Connection
             else if (msg.startsWith('VIEWER:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
                 role = 'viewer_control';
-                
                 if (!rooms.has(currentId)) rooms.set(currentId, {});
                 rooms.get(currentId).viewerControlWs = ws;
                 console.log(`Viewer (Control) connected for: ${currentId}`);
@@ -71,9 +63,9 @@ wss.on('connection', (ws) => {
             // 5. Control Commands Forwarding (Viewer_Control se Host_Control tak)
             else if (role === 'viewer_control' && currentId) {
                 const room = rooms.get(currentId);
-                // Ab hum hostControlWs par bhej rahe hain, na ki hostWs par
                 if (room && room.hostControlWs && room.hostControlWs.readyState === WebSocket.OPEN) {
                     room.hostControlWs.send(message);
+                    console.log(`Forwarded to Host Control: ${currentId}`);
                 } else {
                     console.log(`Host Control WS not found for ${currentId}`);
                 }
@@ -92,10 +84,11 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         if (currentId && rooms.has(currentId)) {
             const room = rooms.get(currentId);
-            if (role === 'host') rooms.delete(currentId); // Agar main host disconnect ho, to poora room delete
+            if (role === 'host') rooms.delete(currentId);
             else if (role === 'viewer') room.viewerWs = null;
             else if (role === 'viewer_control') room.viewerControlWs = null;
             else if (role === 'host_control') room.hostControlWs = null;
+            console.log(`Connection closed for ${role}: ${currentId}`);
         }
     });
 });
