@@ -56,24 +56,27 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).viewerControlWs = ws;
                 console.log(`Viewer (Control) connected for: ${currentId}`);
             }
-            // Forwarding: Viewer -> Host
+            // Forwarding: Viewer -> Host (Client se Host tak)
             else if (role === 'viewer_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.hostControlWs && room.hostControlWs.readyState === WebSocket.OPEN) {
                     room.hostControlWs.send(message.toString()); 
                     console.log(`Forwarded to Host Control: ${currentId}`);
                 } else {
+                    // NAYA: Agar Host offline hai to Viewer ko error bhejein
+                    if (room && room.viewerControlWs) {
+                        room.viewerControlWs.send("ERROR:HOST_OFFLINE");
+                    }
                     console.log(`Cannot forward to Host: ${currentId}`);
                 }
             }
-            // Forwarding: Host -> Viewer
+            // Forwarding: Host -> Viewer (Host se Client tak)
             else if (role === 'host_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.viewerControlWs && room.viewerControlWs.readyState === WebSocket.OPEN) {
                     room.viewerControlWs.send(message.toString()); 
                     console.log(`Forwarded to Viewer Control: ${currentId}`);
                 } else {
-                    // NAYA: Agar Viewer offline hai to Host ko error bhejein
                     if (room && room.hostControlWs) {
                         room.hostControlWs.send("ERROR:VIEWER_OFFLINE");
                     }
