@@ -60,7 +60,7 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).viewerControlWs = ws;
                 console.log(`Viewer (Control) connected for: ${currentId}`);
             }
-            // 5. Text Commands Forwarding
+            // 5. Text Commands Forwarding (READY, FILE_START, FILE_END)
             else if (role === 'viewer_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.hostControlWs && room.hostControlWs.readyState === WebSocket.OPEN) {
@@ -109,6 +109,7 @@ wss.on('connection', (ws) => {
             else if (role === 'viewer') room.viewerWs = null;
             else if (role === 'viewer_control') room.viewerControlWs = null;
             else if (role === 'host_control') room.hostControlWs = null;
+            console.log(`Connection closed for ${role}: ${currentId}`);
         }
     });
 });
