@@ -16,7 +16,7 @@ wss.on('connection', (ws) => {
             const msg = message.toString().trim();
             console.log(`[Server Received]: ${msg}`);
 
-            // 1. Host Registration (Video ke liye)
+            // 1. Host Registration (Video)
             if (msg.startsWith('REG:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
@@ -26,7 +26,7 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).password = parts[2];
                 console.log(`Host Registered: ${currentId}`);
             }
-            // 2. Host Control Registration (Mouse/Keyboard/File ke liye)
+            // 2. Host Control Registration (Mouse/Keyboard/File)
             else if (msg.startsWith('HOST_CTRL:')) {
                 const parts = msg.split(':');
                 currentId = parts[1];
@@ -60,37 +60,40 @@ wss.on('connection', (ws) => {
                 rooms.get(currentId).viewerControlWs = ws;
                 console.log(`Viewer (Control) connected for: ${currentId}`);
             }
-            // 5. Text Commands Forwarding (FIXED: .toString() lagaya gaya hai)
+            // 5. Text Commands Forwarding
             else if (role === 'viewer_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.hostControlWs && room.hostControlWs.readyState === WebSocket.OPEN) {
                     room.hostControlWs.send(message.toString()); 
+                    console.log(`Forwarded to Host Control: ${currentId}`);
+                } else {
+                    console.log(`Cannot forward to Host: ${currentId}`);
                 }
             }
             else if (role === 'host_control' && currentId) {
                 const room = rooms.get(currentId);
                 if (room && room.viewerControlWs && room.viewerControlWs.readyState === WebSocket.OPEN) {
                     room.viewerControlWs.send(message.toString()); 
+                    console.log(`Forwarded to Viewer Control: ${currentId}`);
+                } else {
+                    console.log(`Cannot forward to Viewer: ${currentId}`);
                 }
             }
         } else {
             // Binary Data Relay (Screen Frames & File Chunks)
             if (role === 'host' && currentId) {
-                // Host -> Viewer (Screen)
                 const room = rooms.get(currentId);
                 if (room && room.viewerWs && room.viewerWs.readyState === WebSocket.OPEN) {
                     room.viewerWs.send(message, { binary: true });
                 }
             }
             else if (role === 'host_control' && currentId) {
-                // Host -> Viewer (File)
                 const room = rooms.get(currentId);
                 if (room && room.viewerControlWs && room.viewerControlWs.readyState === WebSocket.OPEN) {
                     room.viewerControlWs.send(message, { binary: true });
                 }
             }
             else if (role === 'viewer_control' && currentId) {
-                // Viewer -> Host (File)
                 const room = rooms.get(currentId);
                 if (room && room.hostControlWs && room.hostControlWs.readyState === WebSocket.OPEN) {
                     room.hostControlWs.send(message, { binary: true });
